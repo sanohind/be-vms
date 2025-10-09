@@ -27,6 +27,7 @@ class Visitor extends Model
         'visitor_date',
         'visitor_name',
         'visitor_from',
+        'bp_code',
         'visitor_host',
         'visitor_needs',
         'visitor_amount',

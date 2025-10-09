@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use Carbon\Carbon;
 use App\Models\Visitor;
+use App\Models\BusinessPartner;
 use Illuminate\Http\Request;
 use App\Http\Resources\VisitorResource;
 use Illuminate\Support\Facades\Storage;
@@ -79,11 +80,31 @@ class VisitorController
         // Create the new visitor ID
         $visitorId = $visitorPrefix . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
 
+        // Handle bp_code and visitor_from based on visitor_needs
+        $bpCode = null;
+        $visitorFrom = $request->visitor_from;
+        
+        if ($request->visitor_needs === 'Delivery' && !empty($request->visitor_from)) {
+            // For Delivery visitors, visitor_from contains bp_code
+            $bpCode = $request->visitor_from;
+            
+            // Get the actual company name from business_partner table
+            $supplier = BusinessPartner::select('bp_name')
+                ->where('bp_code', $request->visitor_from)
+                ->where('bp_status_desc', 'Active')
+                ->first();
+            
+            if ($supplier) {
+                $visitorFrom = $supplier->bp_name;
+            }
+        }
+
         // Create the visitor record in the database
         $visitor = Visitor::create([
             'visitor_id'       => $visitorId,
             'visitor_name'     => $request->visitor_name,
-            'visitor_from'     => $request->visitor_from,
+            'visitor_from'     => $visitorFrom,
+            'bp_code'          => $bpCode,
             'visitor_host'     => $request->visitor_host,
             'visitor_needs'    => $request->visitor_needs,
             'visitor_amount'   => $request->visitor_amount,
@@ -188,8 +209,46 @@ class VisitorController
             return response()->json(['error' => 'Visitor not found'], 404);
         }
 
-        // Return visitor data as JSON
-        return response()->json($visitor);
+        // Generate QR code data URL
+        $qrCode = new QrCode($visitor->visitor_id);
+        $writer = new PngWriter();
+        $qrCodeData = $writer->write($qrCode)->getString();
+        $qrCodeDataUrl = 'data:image/png;base64,' . base64_encode($qrCodeData);
+
+        // Return the Blade view that includes the JavaScript for printing
+        return view('print_receipt', [
+            'visitor'       => $visitor,
+            'qrCodeDataUrl' => $qrCodeDataUrl
+        ]);
+    }
+
+    public function getPrintData($visitor_id)
+    {
+        // Fetch visitor data based on the visitor ID
+        $visitor = Visitor::find($visitor_id);
+
+        if (!$visitor) {
+            return response()->json(['error' => 'Visitor not found'], 404);
+        }
+
+        // Return JSON data for frontend
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'visitor_id' => $visitor->visitor_id,
+                'visitor_date' => $visitor->visitor_date,
+                'visitor_name' => $visitor->visitor_name,
+                'visitor_from' => $visitor->visitor_from,
+                'visitor_host' => $visitor->visitor_host,
+                'visitor_needs' => $visitor->visitor_needs,
+                'visitor_amount' => $visitor->visitor_amount,
+                'visitor_vehicle' => $visitor->visitor_vehicle,
+                'department' => $visitor->department,
+                'visitor_checkin' => $visitor->visitor_checkin,
+                'visitor_checkout' => $visitor->visitor_checkout,
+                'bp_code' => $visitor->bp_code
+            ]
+        ]);
     }
 
     public function display()
