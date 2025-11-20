@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\VisitorController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\BusinessPartnerController;
 use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\DeliveryController;
 
 // List all visitors from today (index)
 Route::get('/visitor', [VisitorController::class, 'index']);
@@ -81,5 +82,11 @@ Route::prefix('business-partner')->group(function () {
     
     // Get dashboard data for a specific business partner
     Route::get('/{bpCode}/dashboard', [BusinessPartnerController::class, 'getDashboard']);
+});
+
+// Delivery routes
+Route::prefix('delivery')->group(function () {
+    // Get delivery data for today from dn_header table
+    Route::get('/today', [DeliveryController::class, 'getTodayDelivery']);
 });
 

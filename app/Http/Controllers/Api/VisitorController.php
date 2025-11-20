@@ -8,6 +8,7 @@ use App\Models\BusinessPartner;
 use Illuminate\Http\Request;
 use App\Http\Resources\VisitorResource;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
@@ -18,9 +19,10 @@ class VisitorController
     // View List Data Visitor
     public function index()
     {
+        // Use visitor connection which is specifically configured for visitor database
         $data_visitor = Visitor::whereDate('visitor_date', Carbon::today())
-                                ->orderby('visitor_checkin', 'asc')
-                                ->get();
+            ->orderby('visitor_checkin', 'asc')
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -40,6 +42,7 @@ class VisitorController
             'visitor_needs'   => 'nullable|string|max:255',
             'visitor_amount'  => 'nullable|integer',
             'visitor_vehicle' => 'nullable|string|max:10',
+            'plan_delivery_time' => 'nullable|string|max:8',
         ]);
 
         // Determine the prefix based on visitor needs
@@ -68,13 +71,16 @@ class VisitorController
         $visitorPrefix = $prefix . $currentYearShort; // e.g., 'MT24'
 
         // Retrieve the latest visitor ID with the same prefix
-        $latestVisitor = Visitor::where('visitor_id', 'like', "$visitorPrefix%")
+        // Use 'visitor' connection which is specifically configured for visitor database
+        $latestVisitorData = DB::connection('visitor')
+            ->table('visitor')
+            ->where('visitor_id', 'like', "$visitorPrefix%")
             ->orderBy('visitor_id', 'desc')
             ->first();
 
         // Calculate the new visitor number
-        $newNumber = $latestVisitor
-            ? ((int)substr($latestVisitor->visitor_id, strlen($visitorPrefix))) + 1
+        $newNumber = $latestVisitorData
+            ? ((int)substr($latestVisitorData->visitor_id, strlen($visitorPrefix))) + 1
             : 1;
 
         // Create the new visitor ID
@@ -99,8 +105,8 @@ class VisitorController
             }
         }
 
-        // Create the visitor record in the database
-        $visitor = Visitor::create([
+        // Create the visitor record in the database using 'visitor' connection
+        DB::connection('visitor')->table('visitor')->insert([
             'visitor_id'       => $visitorId,
             'visitor_name'     => $request->visitor_name,
             'visitor_from'     => $visitorFrom,
@@ -109,10 +115,14 @@ class VisitorController
             'visitor_needs'    => $request->visitor_needs,
             'visitor_amount'   => $request->visitor_amount,
             'visitor_vehicle'  => $request->visitor_vehicle,
-            'department'       => $request->department,
+            'plan_delivery_time' => $request->plan_delivery_time,
+            'department'       => $request->department ?? '',
             'visitor_date'     => Carbon::today(),
             'visitor_checkin'  => Carbon::now(),
         ]);
+        
+        // Fetch the created visitor (model already uses 'visitor' connection)
+        $visitor = Visitor::find($visitorId);
 
         // Return a JSON response without QR code or view rendering
         return response()->json([
@@ -187,6 +197,7 @@ class VisitorController
 
     public function update($visitor_id)
     {
+        // Use visitor connection which is specifically configured for visitor database
         $visitor = Visitor::where('visitor_id', $visitor_id)->firstOrFail();
 
         $visitor->update([
@@ -203,6 +214,7 @@ class VisitorController
     public function printVisitor($visitor_id)
     {
         // Fetch visitor data based on the visitor ID
+        // Use visitor connection which is specifically configured for visitor database
         $visitor = Visitor::find($visitor_id);
 
         if (!$visitor) {
@@ -225,6 +237,7 @@ class VisitorController
     public function getPrintData($visitor_id)
     {
         // Fetch visitor data based on the visitor ID
+        // Use visitor connection which is specifically configured for visitor database
         $visitor = Visitor::find($visitor_id);
 
         if (!$visitor) {
@@ -243,6 +256,7 @@ class VisitorController
                 'visitor_needs' => $visitor->visitor_needs,
                 'visitor_amount' => $visitor->visitor_amount,
                 'visitor_vehicle' => $visitor->visitor_vehicle,
+                'plan_delivery_time' => $visitor->plan_delivery_time,
                 'department' => $visitor->department,
                 'visitor_checkin' => $visitor->visitor_checkin,
                 'visitor_checkout' => $visitor->visitor_checkout,
@@ -253,6 +267,7 @@ class VisitorController
 
     public function display()
     {
+        // Use visitor connection which is specifically configured for visitor database
         $data_visitor = Visitor::with('visitor')->get();
 
         return response()->json([

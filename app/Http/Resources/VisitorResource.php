@@ -24,6 +24,7 @@ class VisitorResource extends JsonResource
             'visitor_needs' => $this->visitor_needs,
             'visitor_amount' => $this->visitor_amount,
             'visitor_vehicle' => $this->visitor_vehicle,
+            'plan_delivery_time' => $this->plan_delivery_time,
             'department' => $this->department,
             // 'visitor_img' => $this->visitor_img,
 

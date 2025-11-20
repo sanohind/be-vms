@@ -12,7 +12,7 @@ class Visitor extends Model
 {
     use HasFactory;
 
-    protected $connection = "mysql";
+    protected $connection = "visitor";
 
     public $incrementing = false;
 
@@ -32,6 +32,7 @@ class Visitor extends Model
         'visitor_needs',
         'visitor_amount',
         'visitor_vehicle',
+        'plan_delivery_time',
         'department',
         'visitor_img',
         'visitor_checkin',
